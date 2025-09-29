@@ -63,6 +63,38 @@ function CinemaSeatBooking({
   const [selectedSeats, setSelectedSeats] = useState([]);
 
   /**
+   * Helper function to get Tailwind color classes based on color name
+   * @param {string} color - Color name (blue, purple, yellow, green)
+   * @returns {Object} - Object with background, border, and text color classes
+   */
+  const getColorClass = (color) => {
+    const colorMap = {
+      blue: {
+        bg: 'bg-blue-500',
+        border: 'border-blue-600',
+        text: 'text-white'
+      },
+      purple: {
+        bg: 'bg-purple-500',
+        border: 'border-purple-600',
+        text: 'text-white'
+      },
+      yellow: {
+        bg: 'bg-yellow-400',
+        border: 'border-yellow-500',
+        text: 'text-gray-900'
+      },
+      green: {
+        bg: 'bg-green-500',
+        border: 'border-green-600',
+        text: 'text-white'
+      }
+    };
+
+    return colorMap[color] || colorMap.blue;
+  };
+
+  /**
    * Helper function to get seat type information for a given row
    * @param {number} rowIndex - The row index to check
    * @returns {Object} - Seat type information including type, color, price, and config
@@ -130,6 +162,39 @@ function CinemaSeatBooking({
     setSeats(initializeSeats);
   }, [initializeSeats]);
 
+  /**
+   * Render a section of seats in a row
+   * @param {Array} seatRow - Array of seat objects for the row
+   * @param {number} startIndex - Start index of the section
+   * @param {number} endIndex - End index of the section
+   * @param {number} rowIndex - Row index for key generation
+   * @returns {JSX.Element[]} - Array of seat elements
+   */
+  const renderSeatSection = (seatRow, startIndex, endIndex, rowIndex) => {
+    return seatRow.slice(startIndex, endIndex).map((seat, index) => {
+      const colorClasses = getColorClass(seat.color);
+      const seatNumber = startIndex + index + 1;
+
+      return (
+        <div
+          key={seat.id}
+          className={`
+            w-8 h-10 sm:w-10 sm:h-12 md:w-12 md:h-14
+            ${colorClasses.bg} ${colorClasses.border} ${colorClasses.text}
+            border-2 rounded-t-lg
+            flex items-center justify-center
+            text-xs sm:text-sm font-semibold
+            cursor-pointer
+            transition-all duration-200
+            hover:scale-105
+          `}
+        >
+          {seatNumber}
+        </div>
+      );
+    });
+  };
+
   // Log props for testing
   useEffect(() => {
     console.log('=== CinemaSeatBooking Props ===');
@@ -176,37 +241,50 @@ function CinemaSeatBooking({
           </div>
         </div>
 
-        {/* Temporary display to verify data structure */}
-        <div className="flex justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold mb-4">Seat Data Structure Test</h2>
-            <div className="space-y-2">
-              <p className="text-gray-700">
-                <strong>Total Seats:</strong> {seats.length * (seats[0]?.length || 0)}
-              </p>
-              <p className="text-gray-700">
-                <strong>Rows:</strong> {seats.length}
-              </p>
-              <p className="text-gray-700">
-                <strong>Seats per Row:</strong> {seats[0]?.length || 0}
-              </p>
-              <div className="mt-4">
-                <strong className="text-gray-700">Seat Types:</strong>
-                <ul className="list-disc list-inside mt-2">
-                  {Object.entries(seatTypes).map(([type, config], index) => (
-                    <li key={type} className="text-gray-600">
-                      <span className="capitalize">{type}</span>: {currency}{config.price}
-                      <span className="text-sm text-gray-500"> (Rows: {config.rows.map(r => String.fromCharCode(65 + r)).join(', ')})</span>
-                      <span className="text-sm text-gray-500"> (Color: {COLORS[index % COLORS.length]})</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="mt-4">
-                <p className="text-gray-700">
-                  <strong>Booked Seats:</strong> {bookedSeats.length > 0 ? bookedSeats.join(', ') : 'None'}
-                </p>
-              </div>
+        {/* Seat Map */}
+        <div className="flex justify-center overflow-x-auto pb-8">
+          <div className="inline-block">
+            <div className="flex flex-col gap-2">
+              {seats.map((seatRow, rowIndex) => {
+                const rowLetter = String.fromCharCode(65 + rowIndex);
+                const firstAisle = layout.aislePositions[0];
+                const secondAisle = layout.aislePositions[1];
+
+                return (
+                  <div key={rowLetter} className="flex items-center gap-2">
+                    {/* Row Letter */}
+                    <div className="w-8 text-center font-bold text-gray-600 text-sm">
+                      {rowLetter}
+                    </div>
+
+                    {/* First Section - Before first aisle */}
+                    <div className="flex gap-1">
+                      {renderSeatSection(seatRow, 0, firstAisle, rowIndex)}
+                    </div>
+
+                    {/* First Aisle */}
+                    <div className="w-6 md:w-8"></div>
+
+                    {/* Second Section - Between aisles */}
+                    <div className="flex gap-1">
+                      {renderSeatSection(seatRow, firstAisle, secondAisle, rowIndex)}
+                    </div>
+
+                    {/* Second Aisle */}
+                    <div className="w-6 md:w-8"></div>
+
+                    {/* Third Section - After second aisle */}
+                    <div className="flex gap-1">
+                      {renderSeatSection(seatRow, secondAisle, layout.seatsPerRow, rowIndex)}
+                    </div>
+
+                    {/* Row Letter (right side) */}
+                    <div className="w-8 text-center font-bold text-gray-600 text-sm">
+                      {rowLetter}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
