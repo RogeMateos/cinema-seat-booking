@@ -13,15 +13,15 @@ const DEFAULT_LAYOUT = {
 
 const DEFAULT_SEAT_TYPES = {
   regular: {
-    price: 150,
+    price: 9.99,
     rows: [0, 1, 2, 3, 4]
   },
   premium: {
-    price: 200,
+    price: 12.99,
     rows: [5, 6, 7]
   },
   vip: {
-    price: 300,
+    price: 16.99,
     rows: [8, 9]
   }
 };
@@ -58,7 +58,7 @@ function CinemaSeatBooking({
   layout = DEFAULT_LAYOUT,
   seatTypes = DEFAULT_SEAT_TYPES,
   bookedSeats = [],
-  currency = '₹',
+  currency = '£',
   onBookingComplete = () => {},
   title = 'Cinema Hall Booking',
   subtitle = 'Select your seats'
@@ -211,6 +211,66 @@ function CinemaSeatBooking({
   };
 
   /**
+   * Calculate total price of selected seats
+   * @returns {number} - Total price
+   */
+  const getTotalPrice = () => {
+    return selectedSeats.reduce((total, seat) => total + seat.price, 0);
+  };
+
+  /**
+   * Handle booking completion
+   */
+  const handleBooking = () => {
+    // Validation: Check if any seats are selected
+    if (selectedSeats.length === 0) {
+      alert('Please select at least one seat to book.');
+      return;
+    }
+
+    // Update seats state - mark selected seats as booked
+    setSeats((prevSeats) => {
+      return prevSeats.map((row) => {
+        return row.map((seat) => {
+          // Check if this seat is in selectedSeats
+          const isSelected = selectedSeats.some((s) => s.id === seat.id);
+          if (isSelected) {
+            return {
+              ...seat,
+              status: 'booked',
+              selected: false
+            };
+          }
+          return seat;
+        });
+      });
+    });
+
+    // Create booking data
+    const bookingData = {
+      seats: selectedSeats.map((seat) => ({
+        id: seat.id,
+        type: seat.type,
+        price: seat.price
+      })),
+      totalPrice: getTotalPrice(),
+      seatIds: selectedSeats.map((s) => s.id),
+      timestamp: new Date().toISOString()
+    };
+
+    // Call parent callback
+    onBookingComplete(bookingData);
+
+    // Show success message
+    const seatCount = selectedSeats.length;
+    const total = getTotalPrice();
+    alert(`Successfully booked ${seatCount} seat(s) for ${currency}${total}!`);
+
+    // Clear selection
+    setSelectedSeats([]);
+  };
+
+  /**
    * Get appropriate className for seat based on its state
    * @param {Object} seat - Seat object with type, status, selected properties
    * @returns {string} - Complete className string for the seat
@@ -359,6 +419,27 @@ function CinemaSeatBooking({
               })}
             </div>
           </div>
+        </div>
+
+        {/* Book Now Button */}
+        <div className="flex justify-center mt-8">
+          <button
+            onClick={handleBooking}
+            disabled={selectedSeats.length === 0}
+            className={`
+              w-full max-w-md px-8 py-4 rounded-lg font-bold text-lg
+              transition-all duration-200 transform
+              ${selectedSeats.length === 0
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-green-500 text-white hover:bg-green-600 hover:scale-105 active:scale-95'
+              }
+            `}
+          >
+            {selectedSeats.length === 0
+              ? 'Select Seats to Book'
+              : `Book ${selectedSeats.length} Seat(s) - ${currency}${getTotalPrice()}`
+            }
+          </button>
         </div>
 
       </div>
