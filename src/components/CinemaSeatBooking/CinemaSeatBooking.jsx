@@ -1,5 +1,8 @@
-import { useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
+
+// Color constants for different seat types
+const COLORS = ['blue', 'purple', 'yellow', 'green'];
 
 /**
  * CinemaSeatBooking Component
@@ -55,6 +58,78 @@ function CinemaSeatBooking({
   title = 'Cinema Hall Booking',
   subtitle = 'Select your seats'
 }) {
+  // State management
+  const [seats, setSeats] = useState([]);
+  const [selectedSeats, setSelectedSeats] = useState([]);
+
+  /**
+   * Helper function to get seat type information for a given row
+   * @param {number} rowIndex - The row index to check
+   * @returns {Object} - Seat type information including type, color, price, and config
+   */
+  const getSeatType = (rowIndex) => {
+    let colorIndex = 0;
+
+    for (const [type, config] of Object.entries(seatTypes)) {
+      if (config.rows.includes(rowIndex)) {
+        return {
+          type,
+          color: COLORS[colorIndex % COLORS.length],
+          price: config.price,
+          config
+        };
+      }
+      colorIndex++;
+    }
+
+    // Fallback for rows not specified in any seat type
+    return {
+      type: 'regular',
+      color: COLORS[0],
+      price: seatTypes.regular?.price || 0,
+      config: seatTypes.regular || {}
+    };
+  };
+
+  /**
+   * Initialize seats data structure
+   * Creates a 2D array of seat objects with unique IDs and properties
+   */
+  const initializeSeats = useMemo(() => {
+    const seatsArray = [];
+
+    for (let row = 0; row < layout.rows; row++) {
+      const rowSeats = [];
+      const rowLetter = String.fromCharCode(65 + row); // A, B, C, etc.
+      const { type, color, price } = getSeatType(row);
+
+      for (let seat = 1; seat <= layout.seatsPerRow; seat++) {
+        const seatId = `${rowLetter}${seat}`;
+        const isBooked = bookedSeats.includes(seatId);
+
+        rowSeats.push({
+          id: seatId,
+          row: rowLetter,
+          seat: seat,
+          type: type,
+          price: price,
+          color: color,
+          status: isBooked ? 'booked' : 'available',
+          selected: false
+        });
+      }
+
+      seatsArray.push(rowSeats);
+    }
+
+    return seatsArray;
+  }, [bookedSeats, layout, seatTypes]);
+
+  // Update seats state when initializeSeats changes
+  useEffect(() => {
+    setSeats(initializeSeats);
+  }, [initializeSeats]);
+
   // Log props for testing
   useEffect(() => {
     console.log('=== CinemaSeatBooking Props ===');
@@ -101,10 +176,38 @@ function CinemaSeatBooking({
           </div>
         </div>
 
-        {/* Placeholder for seats - will be added next */}
+        {/* Temporary display to verify data structure */}
         <div className="flex justify-center">
-          <div className="text-gray-400 text-sm">
-            Seat selection will appear here
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <h2 className="text-xl font-semibold mb-4">Seat Data Structure Test</h2>
+            <div className="space-y-2">
+              <p className="text-gray-700">
+                <strong>Total Seats:</strong> {seats.length * (seats[0]?.length || 0)}
+              </p>
+              <p className="text-gray-700">
+                <strong>Rows:</strong> {seats.length}
+              </p>
+              <p className="text-gray-700">
+                <strong>Seats per Row:</strong> {seats[0]?.length || 0}
+              </p>
+              <div className="mt-4">
+                <strong className="text-gray-700">Seat Types:</strong>
+                <ul className="list-disc list-inside mt-2">
+                  {Object.entries(seatTypes).map(([type, config], index) => (
+                    <li key={type} className="text-gray-600">
+                      <span className="capitalize">{type}</span>: {currency}{config.price}
+                      <span className="text-sm text-gray-500"> (Rows: {config.rows.map(r => String.fromCharCode(65 + r)).join(', ')})</span>
+                      <span className="text-sm text-gray-500"> (Color: {COLORS[index % COLORS.length]})</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="mt-4">
+                <p className="text-gray-700">
+                  <strong>Booked Seats:</strong> {bookedSeats.length > 0 ? bookedSeats.join(', ') : 'None'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
