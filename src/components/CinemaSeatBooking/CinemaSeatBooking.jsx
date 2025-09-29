@@ -138,6 +138,8 @@ function CinemaSeatBooking({
       for (let seat = 1; seat <= layout.seatsPerRow; seat++) {
         const seatId = `${rowLetter}${seat}`;
         const isBooked = bookedSeats.includes(seatId);
+        // Temporarily mark some seats as selected for testing
+        const isSelected = seatId === 'A5' || seatId === 'B3';
 
         rowSeats.push({
           id: seatId,
@@ -147,7 +149,7 @@ function CinemaSeatBooking({
           price: price,
           color: color,
           status: isBooked ? 'booked' : 'available',
-          selected: false
+          selected: isSelected
         });
       }
 
@@ -163,6 +165,30 @@ function CinemaSeatBooking({
   }, [initializeSeats]);
 
   /**
+   * Get appropriate className for seat based on its state
+   * @param {Object} seat - Seat object with type, status, selected properties
+   * @returns {string} - Complete className string for the seat
+   */
+  const getSeatClassName = (seat) => {
+    // Base classes for all seats
+    const baseClasses = 'w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 m-0.5 rounded-t-lg border-2 cursor-pointer transition-all duration-200 flex items-center justify-center text-xs sm:text-sm font-bold';
+
+    // If seat is booked
+    if (seat.status === 'booked') {
+      return `${baseClasses} bg-gray-300 border-gray-400 text-gray-600 cursor-not-allowed`;
+    }
+
+    // If seat is selected
+    if (seat.selected) {
+      return `${baseClasses} bg-green-500 border-green-600 text-white transform scale-110`;
+    }
+
+    // Available seat - use seat type color with hover effect
+    const colorClasses = getColorClass(seat.color);
+    return `${baseClasses} ${colorClasses.bg} ${colorClasses.border} ${colorClasses.text} hover:scale-105`;
+  };
+
+  /**
    * Render a section of seats in a row
    * @param {Array} seatRow - Array of seat objects for the row
    * @param {number} startIndex - Start index of the section
@@ -172,22 +198,19 @@ function CinemaSeatBooking({
    */
   const renderSeatSection = (seatRow, startIndex, endIndex, rowIndex) => {
     return seatRow.slice(startIndex, endIndex).map((seat, index) => {
-      const colorClasses = getColorClass(seat.color);
       const seatNumber = startIndex + index + 1;
+      const seatInfo = `Seat ${seat.id} - ${seat.type} - ${currency}${seat.price}`;
+      const statusText = seat.status === 'booked' ? 'Booked' : seat.selected ? 'Selected' : 'Available';
+      const ariaLabel = `${seatInfo} - ${statusText}`;
 
       return (
         <div
           key={seat.id}
-          className={`
-            w-8 h-10 sm:w-10 sm:h-12 md:w-12 md:h-14
-            ${colorClasses.bg} ${colorClasses.border} ${colorClasses.text}
-            border-2 rounded-t-lg
-            flex items-center justify-center
-            text-xs sm:text-sm font-semibold
-            cursor-pointer
-            transition-all duration-200
-            hover:scale-105
-          `}
+          className={getSeatClassName(seat)}
+          title={seatInfo}
+          aria-label={ariaLabel}
+          role="button"
+          tabIndex={seat.status === 'booked' ? -1 : 0}
         >
           {seatNumber}
         </div>
