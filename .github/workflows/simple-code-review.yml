@@ -1,0 +1,68 @@
+name: 📝 Quick Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  quick-review:
+    runs-on: ubuntu-latest
+    name: Quick Code Analysis
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Quick Analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+
+            try {
+              // Get changed files
+              const changedFiles = execSync(`git diff --name-only origin/${{ github.base_ref }}...HEAD`, {encoding: 'utf8'}).trim().split('\n').filter(f => f);
+
+              let comment = "## 🔍 Quick Code Review\n\n";
+              comment += `**Files changed:** ${changedFiles.length}\n\n`;
+
+              // Basic checks
+              const jsFiles = changedFiles.filter(f => f.endsWith('.js') || f.endsWith('.jsx') || f.endsWith('.ts') || f.endsWith('.tsx'));
+              const cssFiles = changedFiles.filter(f => f.endsWith('.css') || f.endsWith('.scss'));
+              const configFiles = changedFiles.filter(f => f.includes('config') || f.endsWith('.json'));
+
+              if (jsFiles.length > 0) {
+                comment += `⚛️ **JavaScript/TypeScript files:** ${jsFiles.length}\n`;
+              }
+              if (cssFiles.length > 0) {
+                comment += `🎨 **Style files:** ${cssFiles.length}\n`;
+              }
+              if (configFiles.length > 0) {
+                comment += `⚙️ **Config files:** ${configFiles.length}\n`;
+              }
+
+              comment += "\n### 📋 Checklist\n";
+              comment += "- [ ] Tests are passing\n";
+              comment += "- [ ] Code follows project conventions\n";
+              comment += "- [ ] No console.log statements in production code\n";
+              comment += "- [ ] Documentation updated if needed\n";
+              comment += "- [ ] Type safety maintained\n\n";
+
+              comment += "*🤖 Automated quick review*";
+
+              await github.rest.issues.createComment({
+                issue_number: context.payload.pull_request.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+
+            } catch (error) {
+              console.log('Error in quick review:', error);
+            }

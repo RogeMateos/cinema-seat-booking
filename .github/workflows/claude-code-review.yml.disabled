@@ -1,0 +1,202 @@
+name: 🤖 Claude AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, master]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  statuses: write
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    name: Claude AI Code Review
+
+    steps:
+      - name: 🔍 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📊 Get PR Changes
+        id: changes
+        run: |
+          # Get list of changed files
+          git fetch origin ${{ github.base_ref }}
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Get file count
+          FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l)
+          echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+
+          # Get total lines changed
+          LINES_CHANGED=$(git diff --stat origin/${{ github.base_ref }}...HEAD | tail -1 | grep -o '[0-9]\+ insertions\|[0-9]\+ deletions' | grep -o '[0-9]\+' | paste -sd+ | bc || echo "0")
+          echo "lines_changed=$LINES_CHANGED" >> $GITHUB_OUTPUT
+
+      - name: 🤖 Claude AI Code Review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Get PR info
+            const pr = context.payload.pull_request;
+            const changedFiles = `${{ steps.changes.outputs.changed_files }}`.split('\n').filter(f => f.length > 0);
+            const fileCount = ${{ steps.changes.outputs.file_count }};
+            const linesChanged = ${{ steps.changes.outputs.lines_changed }};
+
+            console.log(`📊 Analyzing ${fileCount} files with ${linesChanged} lines changed`);
+
+            // Analyze code patterns
+            let issues = [];
+            let suggestions = [];
+            let codeSmells = [];
+
+            for (const file of changedFiles) {
+              if (!fs.existsSync(file)) continue;
+
+              try {
+                const content = fs.readFileSync(file, 'utf8');
+                const lines = content.split('\n');
+
+                // Check for code smells and issues
+                lines.forEach((line, index) => {
+                  const lineNum = index + 1;
+                  const trimmed = line.trim();
+
+                  // Console.log detection
+                  if (trimmed.includes('console.log') || trimmed.includes('console.error')) {
+                    issues.push(`🔍 **Debug statement found** in \`${file}:${lineNum}\`\n   \`${trimmed}\`\n   💡 Consider removing or using proper logging`);
+                  }
+
+                  // TODO/FIXME detection
+                  if (trimmed.includes('TODO') || trimmed.includes('FIXME')) {
+                    codeSmells.push(`📝 **Technical debt** in \`${file}:${lineNum}\`\n   \`${trimmed}\`\n   💡 Consider addressing this before merging`);
+                  }
+
+                  // TypeScript any type
+                  if (trimmed.includes(': any') || trimmed.includes('<any>')) {
+                    codeSmells.push(`⚠️ **Type safety issue** in \`${file}:${lineNum}\`\n   \`${trimmed}\`\n   💡 Consider using specific types instead of \`any\``);
+                  }
+
+                  // Large functions (simplified detection)
+                  if (trimmed.includes('function ') || trimmed.includes('const ') && trimmed.includes(' => ')) {
+                    // This is a basic function detection - in real implementation you'd want more sophisticated parsing
+                  }
+
+                  // Missing error handling
+                  if (trimmed.includes('fetch(') || trimmed.includes('axios.') || trimmed.includes('api.')) {
+                    suggestions.push(`🛡️ **API call in** \`${file}:${lineNum}\`\n   💡 Ensure proper error handling and loading states`);
+                  }
+                });
+
+                // File-level analysis
+                if (file.endsWith('.tsx') || file.endsWith('.jsx')) {
+                  if (!content.includes('import React')) {
+                    suggestions.push(`⚛️ **React component** \`${file}\`\n   💡 Consider explicit React import for better compatibility`);
+                  }
+                }
+
+                if (file.endsWith('.ts') || file.endsWith('.tsx')) {
+                  if (!content.includes('export')) {
+                    suggestions.push(`📦 **TypeScript file** \`${file}\`\n   💡 Consider adding exports for better modularity`);
+                  }
+                }
+
+              } catch (error) {
+                console.log(`Could not analyze ${file}: ${error.message}`);
+              }
+            }
+
+            // Generate AI Review Comment
+            let reviewBody = `## 🤖 Claude AI Code Review\n\n`;
+            reviewBody += `**PR Summary:** ${pr.title}\n`;
+            reviewBody += `**Author:** @${pr.user.login}\n`;
+            reviewBody += `**Files Changed:** ${fileCount} files, ${linesChanged} lines\n\n`;
+
+            // Overall assessment
+            const riskLevel = linesChanged > 500 ? '🔴 High' : linesChanged > 100 ? '🟡 Medium' : '🟢 Low';
+            reviewBody += `**Risk Level:** ${riskLevel}\n\n`;
+
+            if (linesChanged > 500) {
+              reviewBody += `⚠️ **Large PR Warning:** This PR modifies ${linesChanged} lines across ${fileCount} files. Consider breaking it into smaller, focused PRs.\n\n`;
+            }
+
+            // Issues section
+            if (issues.length > 0) {
+              reviewBody += `### 🚨 Issues Found (${issues.length})\n\n`;
+              issues.slice(0, 10).forEach(issue => {
+                reviewBody += `${issue}\n\n`;
+              });
+              if (issues.length > 10) {
+                reviewBody += `... and ${issues.length - 10} more issues\n\n`;
+              }
+            }
+
+            // Code smells section
+            if (codeSmells.length > 0) {
+              reviewBody += `### 🔍 Code Quality Suggestions (${codeSmells.length})\n\n`;
+              codeSmells.slice(0, 8).forEach(smell => {
+                reviewBody += `${smell}\n\n`;
+              });
+              if (codeSmells.length > 8) {
+                reviewBody += `... and ${codeSmells.length - 8} more suggestions\n\n`;
+              }
+            }
+
+            // General suggestions
+            if (suggestions.length > 0) {
+              reviewBody += `### 💡 General Suggestions (${suggestions.length})\n\n`;
+              suggestions.slice(0, 5).forEach(suggestion => {
+                reviewBody += `${suggestion}\n\n`;
+              });
+            }
+
+            // Positive feedback
+            if (issues.length === 0 && codeSmells.length === 0) {
+              reviewBody += `### ✅ Great Job!\n\n`;
+              reviewBody += `No major issues detected. The code looks clean and follows good practices! 🎉\n\n`;
+            }
+
+            // File-specific analysis
+            reviewBody += `### 📂 Files Analysis\n\n`;
+            const fileTypes = {};
+            changedFiles.forEach(file => {
+              const ext = path.extname(file);
+              fileTypes[ext] = (fileTypes[ext] || 0) + 1;
+            });
+
+            Object.entries(fileTypes).forEach(([ext, count]) => {
+              const emoji = ext === '.tsx' ? '⚛️' : ext === '.ts' ? '📘' : ext === '.css' ? '🎨' : ext === '.md' ? '📝' : '📄';
+              reviewBody += `${emoji} **${ext || 'no extension'}**: ${count} files\n`;
+            });
+
+            reviewBody += `\n### 🔗 Changed Files\n\n`;
+            changedFiles.slice(0, 20).forEach(file => {
+              reviewBody += `- \`${file}\`\n`;
+            });
+            if (changedFiles.length > 20) {
+              reviewBody += `- ... and ${changedFiles.length - 20} more files\n`;
+            }
+
+            reviewBody += `\n---\n`;
+            reviewBody += `*🤖 This review was automatically generated by Claude AI*\n`;
+            reviewBody += `*⏰ Reviewed at: ${new Date().toISOString()}*`;
+
+            // Post the review
+            await github.rest.issues.createComment({
+              issue_number: pr.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: reviewBody
+            });
+
+            console.log('✅ AI Code Review completed successfully!');

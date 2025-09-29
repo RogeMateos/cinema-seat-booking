@@ -1,0 +1,115 @@
+name: 🤖 Claude AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    name: AI Code Review
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 AI Code Analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+
+            try {
+              // Get changed files
+              const changedFiles = execSync(`git diff --name-only origin/${{ github.base_ref }}...HEAD`, {encoding: 'utf8'})
+                .trim().split('\n').filter(f => f);
+
+              console.log(`Analyzing ${changedFiles.length} changed files`);
+
+              let reviewBody = `## 🤖 Claude AI Code Review\n\n`;
+              reviewBody += `**Files Changed:** ${changedFiles.length}\n`;
+              reviewBody += `**PR:** ${context.payload.pull_request.title}\n`;
+              reviewBody += `**Author:** @${context.payload.pull_request.user.login}\n\n`;
+
+              // Simple analysis
+              let issues = [];
+              const fs = require('fs');
+
+              for (const file of changedFiles) {
+                if (!fs.existsSync(file)) continue;
+
+                try {
+                  const content = fs.readFileSync(file, 'utf8');
+                  const lines = content.split('\n');
+
+                  lines.forEach((line, index) => {
+                    const trimmed = line.trim();
+                    const lineNum = index + 1;
+
+                    // Console.log detection
+                    if (trimmed.includes('console.log')) {
+                      issues.push(`🔍 Debug statement in \`${file}:${lineNum}\` - \`${trimmed}\``);
+                    }
+
+                    // Any type detection
+                    if (trimmed.includes(': any')) {
+                      issues.push(`⚠️ Any type usage in \`${file}:${lineNum}\` - \`${trimmed}\``);
+                    }
+
+                    // TODO detection
+                    if (trimmed.includes('TODO') || trimmed.includes('FIXME')) {
+                      issues.push(`📝 Technical debt in \`${file}:${lineNum}\` - \`${trimmed}\``);
+                    }
+                  });
+                } catch (error) {
+                  console.log(`Could not analyze ${file}: ${error.message}`);
+                }
+              }
+
+              // Build review
+              if (issues.length > 0) {
+                reviewBody += `### 🚨 Issues Found (${issues.length})\n\n`;
+                issues.slice(0, 10).forEach(issue => {
+                  reviewBody += `- ${issue}\n`;
+                });
+                if (issues.length > 10) {
+                  reviewBody += `\n... and ${issues.length - 10} more issues\n`;
+                }
+              } else {
+                reviewBody += `### ✅ No Issues Found\n\nGreat job! No obvious issues detected.\n`;
+              }
+
+              reviewBody += `\n### 📂 Files\n\n`;
+              changedFiles.forEach(file => {
+                reviewBody += `- \`${file}\`\n`;
+              });
+
+              reviewBody += `\n---\n*🤖 Automated review by Claude AI*`;
+
+              // Post comment
+              await github.rest.issues.createComment({
+                issue_number: context.payload.pull_request.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: reviewBody
+              });
+
+              console.log('✅ Review posted successfully!');
+
+            } catch (error) {
+              console.error('❌ Review failed:', error);
+
+              // Post error comment
+              await github.rest.issues.createComment({
+                issue_number: context.payload.pull_request.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🤖 Claude AI Code Review\n\n❌ **Review failed due to technical error**\n\nPlease check the workflow logs for details.\n\n*🤖 Automated review by Claude AI*`
+              });
+            }
