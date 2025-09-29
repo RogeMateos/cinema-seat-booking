@@ -69,8 +69,46 @@ function CinemaSeatBooking({
   }, [layout, seatTypes, bookedSeats, currency, title, subtitle, onBookingComplete]);
 
   return (
-    <div className="w-full h-screen flex items-center justify-center">
-      <h1 className="text-4xl font-bold text-gray-800">Cinema Seat Booking</h1>
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      {/* Main Container - Centered with max width */}
+      <div className="max-w-6xl mx-auto">
+
+        {/* Title Section */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-3">
+            {title}
+          </h1>
+          <p className="text-lg md:text-xl text-gray-600">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Cinema Screen */}
+        <div className="flex flex-col items-center mb-16">
+          {/* Screen visual - curved gradient */}
+          <div className="w-full max-w-4xl mb-4">
+            <div className="h-2 bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 rounded-t-full shadow-lg transform perspective-1000"
+                 style={{
+                   boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                   transform: 'perspective(400px) rotateX(-15deg)'
+                 }}>
+            </div>
+          </div>
+
+          {/* Screen Label */}
+          <div className="text-sm font-medium text-gray-500 tracking-widest">
+            SCREEN
+          </div>
+        </div>
+
+        {/* Placeholder for seats - will be added next */}
+        <div className="flex justify-center">
+          <div className="text-gray-400 text-sm">
+            Seat selection will appear here
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
