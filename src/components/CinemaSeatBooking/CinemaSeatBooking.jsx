@@ -1,8 +1,30 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
 // Color constants for different seat types
 const COLORS = ['blue', 'purple', 'yellow', 'green'];
+
+// Default values (defined outside component to prevent recreating objects)
+const DEFAULT_LAYOUT = {
+  rows: 10,
+  seatsPerRow: 12,
+  aislePositions: [3, 9]
+};
+
+const DEFAULT_SEAT_TYPES = {
+  regular: {
+    price: 150,
+    rows: [0, 1, 2, 3, 4]
+  },
+  premium: {
+    price: 200,
+    rows: [5, 6, 7]
+  },
+  vip: {
+    price: 300,
+    rows: [8, 9]
+  }
+};
 
 /**
  * CinemaSeatBooking Component
@@ -33,25 +55,8 @@ const COLORS = ['blue', 'purple', 'yellow', 'green'];
  * @param {string} props.subtitle - Subtitle text instructing users (default: 'Select your seats')
  */
 function CinemaSeatBooking({
-  layout = {
-    rows: 10,
-    seatsPerRow: 12,
-    aislePositions: [3, 9]
-  },
-  seatTypes = {
-    regular: {
-      price: 150,
-      rows: [0, 1, 2, 3, 4]
-    },
-    premium: {
-      price: 200,
-      rows: [5, 6, 7]
-    },
-    vip: {
-      price: 300,
-      rows: [8, 9]
-    }
-  },
+  layout = DEFAULT_LAYOUT,
+  seatTypes = DEFAULT_SEAT_TYPES,
   bookedSeats = [],
   currency = '₹',
   onBookingComplete = () => {},
@@ -99,7 +104,7 @@ function CinemaSeatBooking({
    * @param {number} rowIndex - The row index to check
    * @returns {Object} - Seat type information including type, color, price, and config
    */
-  const getSeatType = (rowIndex) => {
+  const getSeatType = useCallback((rowIndex) => {
     let colorIndex = 0;
 
     for (const [type, config] of Object.entries(seatTypes)) {
@@ -121,7 +126,7 @@ function CinemaSeatBooking({
       price: seatTypes.regular?.price || 0,
       config: seatTypes.regular || {}
     };
-  };
+  }, [seatTypes]);
 
   /**
    * Initialize seats data structure
@@ -157,10 +162,77 @@ function CinemaSeatBooking({
     return seatsArray;
   }, [bookedSeats, layout, seatTypes]);
 
-  // Update seats state when initializeSeats changes
+  // Initialize seats ONLY on mount
   useEffect(() => {
     setSeats(initializeSeats);
-  }, [initializeSeats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Handle seat click/selection
+   * @param {number} rowIndex - Row index in the seats array
+   * @param {number} seatIndex - Seat index in the row array
+   */
+  const handleSeatClick = (rowIndex, seatIndex) => {
+    const seat = seats[rowIndex][seatIndex];
+
+    // Guard clause: prevent clicking booked seats
+    if (seat.status === 'booked') {
+      return;
+    }
+
+    const isCurrentlySelected = seat.selected;
+
+    // Update seats state immutably
+    setSeats((prevSeats) => {
+      return prevSeats.map((row, rIdx) => {
+        if (rIdx === rowIndex) {
+          return row.map((s, sIdx) => {
+            if (sIdx === seatIndex) {
+              return { ...s, selected: !s.selected };
+            }
+            return s;
+          });
+        }
+        return row;
+      });
+    });
+
+    // Update selectedSeats array
+    setSelectedSeats((prevSelected) => {
+      if (isCurrentlySelected) {
+        // Remove seat from selectedSeats
+        return prevSelected.filter((s) => s.id !== seat.id);
+      } else {
+        // Add seat to selectedSeats
+        return [...prevSelected, seat];
+      }
+    });
+  };
+
+  /**
+   * Get appropriate className for seat based on its state
+   * @param {Object} seat - Seat object with type, status, selected properties
+   * @returns {string} - Complete className string for the seat
+   */
+  const getSeatClassName = (seat) => {
+    // Base classes for all seats
+    const baseClasses = 'w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 m-0.5 rounded-t-lg border-2 cursor-pointer transition-all duration-200 flex items-center justify-center text-xs sm:text-sm font-bold';
+
+    // If seat is booked
+    if (seat.status === 'booked') {
+      return `${baseClasses} bg-gray-300 border-gray-400 text-gray-600 cursor-not-allowed`;
+    }
+
+    // If seat is selected
+    if (seat.selected) {
+      return `${baseClasses} bg-green-500 border-green-600 text-white transform scale-110`;
+    }
+
+    // Available seat - use seat type color with hover effect
+    const colorClasses = getColorClass(seat.color);
+    return `${baseClasses} ${colorClasses.bg} ${colorClasses.border} ${colorClasses.text} hover:scale-105`;
+  };
 
   /**
    * Render a section of seats in a row
@@ -172,22 +244,34 @@ function CinemaSeatBooking({
    */
   const renderSeatSection = (seatRow, startIndex, endIndex, rowIndex) => {
     return seatRow.slice(startIndex, endIndex).map((seat, index) => {
-      const colorClasses = getColorClass(seat.color);
       const seatNumber = startIndex + index + 1;
+      const seatIndex = startIndex + index;
+      const seatInfo = `Seat ${seat.id} - ${seat.type} - ${currency}${seat.price}`;
+      const statusText = seat.status === 'booked' ? 'Booked' : seat.selected ? 'Selected' : 'Available';
+      const ariaLabel = `${seatInfo} - ${statusText}`;
+      const className = getSeatClassName(seat);
+
+      /**
+       * Handle keyboard events for accessibility
+       * @param {KeyboardEvent} e - Keyboard event
+       */
+      const handleKeyDown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleSeatClick(rowIndex, seatIndex);
+        }
+      };
 
       return (
         <div
           key={seat.id}
-          className={`
-            w-8 h-10 sm:w-10 sm:h-12 md:w-12 md:h-14
-            ${colorClasses.bg} ${colorClasses.border} ${colorClasses.text}
-            border-2 rounded-t-lg
-            flex items-center justify-center
-            text-xs sm:text-sm font-semibold
-            cursor-pointer
-            transition-all duration-200
-            hover:scale-105
-          `}
+          className={className}
+          title={seatInfo}
+          aria-label={ariaLabel}
+          role="button"
+          tabIndex={seat.status === 'booked' ? -1 : 0}
+          onClick={() => handleSeatClick(rowIndex, seatIndex)}
+          onKeyDown={handleKeyDown}
         >
           {seatNumber}
         </div>
@@ -195,18 +279,6 @@ function CinemaSeatBooking({
     });
   };
 
-  // Log props for testing
-  useEffect(() => {
-    console.log('=== CinemaSeatBooking Props ===');
-    console.log('Layout:', layout);
-    console.log('Seat Types:', seatTypes);
-    console.log('Booked Seats:', bookedSeats);
-    console.log('Currency:', currency);
-    console.log('Title:', title);
-    console.log('Subtitle:', subtitle);
-    console.log('OnBookingComplete:', typeof onBookingComplete);
-    console.log('===============================');
-  }, [layout, seatTypes, bookedSeats, currency, title, subtitle, onBookingComplete]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
