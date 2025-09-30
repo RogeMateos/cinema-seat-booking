@@ -1,59 +1,40 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
 // Color constants for different seat types
 const COLORS = ['blue', 'purple', 'yellow', 'green'];
 
+// Default values (defined outside component to prevent recreating objects)
+const DEFAULT_LAYOUT = {
+  rows: 10,
+  seatsPerRow: 12,
+  aislePositions: [3, 9]
+};
+
+const DEFAULT_SEAT_TYPES = {
+  regular: {
+    price: 9.99,
+    rows: [0, 1, 2, 3, 4]
+  },
+  premium: {
+    price: 12.99,
+    rows: [5, 6, 7]
+  },
+  vip: {
+    price: 16.99,
+    rows: [8, 9]
+  }
+};
+
 /**
  * CinemaSeatBooking Component
  * A highly scalable and configurable component for booking cinema seats
- *
- * @param {Object} props - Component props
- * @param {Object} props.layout - Cinema layout configuration
- * @param {number} props.layout.rows - Total number of rows in the cinema
- * @param {number} props.layout.seatsPerRow - Number of seats in each row
- * @param {number[]} props.layout.aislePositions - Array of aisle positions (e.g., [3, 9] creates aisles after seats 3 and 9)
- * @param {Object} props.seatTypes - Configuration for different seat types with pricing
- * @param {Object} props.seatTypes.regular - Regular seat configuration
- * @param {number} props.seatTypes.regular.price - Price for regular seats
- * @param {number[]} props.seatTypes.regular.rows - Row indices for regular seats (0-based)
- * @param {Object} props.seatTypes.premium - Premium seat configuration
- * @param {number} props.seatTypes.premium.price - Price for premium seats
- * @param {number[]} props.seatTypes.premium.rows - Row indices for premium seats (0-based)
- * @param {Object} props.seatTypes.vip - VIP seat configuration
- * @param {number} props.seatTypes.vip.price - Price for VIP seats
- * @param {number[]} props.seatTypes.vip.rows - Row indices for VIP seats (0-based)
- * @param {string[]} props.bookedSeats - Array of pre-reserved seat IDs (e.g., ['A5', 'B3', 'C10'])
- * @param {string} props.currency - Currency symbol to display (default: '₹')
- * @param {Function} props.onBookingComplete - Callback function triggered when booking is completed
- * @param {Object} props.onBookingComplete.selectedSeats - Array of selected seat IDs
- * @param {number} props.onBookingComplete.totalPrice - Total price of selected seats
- * @param {string} props.onBookingComplete.currency - Currency used
- * @param {string} props.title - Main heading text for the cinema hall (default: 'Cinema Hall Booking')
- * @param {string} props.subtitle - Subtitle text instructing users (default: 'Select your seats')
  */
 function CinemaSeatBooking({
-  layout = {
-    rows: 10,
-    seatsPerRow: 12,
-    aislePositions: [3, 9]
-  },
-  seatTypes = {
-    regular: {
-      price: 150,
-      rows: [0, 1, 2, 3, 4]
-    },
-    premium: {
-      price: 200,
-      rows: [5, 6, 7]
-    },
-    vip: {
-      price: 300,
-      rows: [8, 9]
-    }
-  },
+  layout = DEFAULT_LAYOUT,
+  seatTypes = DEFAULT_SEAT_TYPES,
   bookedSeats = [],
-  currency = '₹',
+  currency = '£',
   onBookingComplete = () => {},
   title = 'Cinema Hall Booking',
   subtitle = 'Select your seats'
@@ -64,8 +45,6 @@ function CinemaSeatBooking({
 
   /**
    * Helper function to get Tailwind color classes based on color name
-   * @param {string} color - Color name (blue, purple, yellow, green)
-   * @returns {Object} - Object with background, border, and text color classes
    */
   const getColorClass = (color) => {
     const colorMap = {
@@ -96,10 +75,8 @@ function CinemaSeatBooking({
 
   /**
    * Helper function to get seat type information for a given row
-   * @param {number} rowIndex - The row index to check
-   * @returns {Object} - Seat type information including type, color, price, and config
    */
-  const getSeatType = (rowIndex) => {
+  const getSeatType = useCallback((rowIndex) => {
     let colorIndex = 0;
 
     for (const [type, config] of Object.entries(seatTypes)) {
@@ -121,25 +98,22 @@ function CinemaSeatBooking({
       price: seatTypes.regular?.price || 0,
       config: seatTypes.regular || {}
     };
-  };
+  }, [seatTypes]);
 
   /**
    * Initialize seats data structure
-   * Creates a 2D array of seat objects with unique IDs and properties
    */
   const initializeSeats = useMemo(() => {
     const seatsArray = [];
 
     for (let row = 0; row < layout.rows; row++) {
       const rowSeats = [];
-      const rowLetter = String.fromCharCode(65 + row); // A, B, C, etc.
+      const rowLetter = String.fromCharCode(65 + row);
       const { type, color, price } = getSeatType(row);
 
       for (let seat = 1; seat <= layout.seatsPerRow; seat++) {
         const seatId = `${rowLetter}${seat}`;
         const isBooked = bookedSeats.includes(seatId);
-        // Temporarily mark some seats as selected for testing
-        const isSelected = seatId === 'A5' || seatId === 'B3';
 
         rowSeats.push({
           id: seatId,
@@ -149,7 +123,7 @@ function CinemaSeatBooking({
           price: price,
           color: color,
           status: isBooked ? 'booked' : 'available',
-          selected: isSelected
+          selected: false
         });
       }
 
@@ -157,60 +131,153 @@ function CinemaSeatBooking({
     }
 
     return seatsArray;
-  }, [bookedSeats, layout, seatTypes]);
+  }, [bookedSeats, layout, getSeatType]);
 
-  // Update seats state when initializeSeats changes
+  // Initialize seats ONLY on mount
   useEffect(() => {
     setSeats(initializeSeats);
-  }, [initializeSeats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Handle seat click/selection
+   */
+  const handleSeatClick = (rowIndex, seatIndex) => {
+    const seat = seats[rowIndex][seatIndex];
+
+    // Guard clause: prevent clicking booked seats
+    if (seat.status === 'booked') {
+      return;
+    }
+
+    const isCurrentlySelected = seat.selected;
+
+    // Update seats state immutably
+    setSeats((prevSeats) => {
+      return prevSeats.map((row, rIdx) => {
+        if (rIdx === rowIndex) {
+          return row.map((s, sIdx) => {
+            if (sIdx === seatIndex) {
+              return { ...s, selected: !s.selected };
+            }
+            return s;
+          });
+        }
+        return row;
+      });
+    });
+
+    // Update selectedSeats array
+    setSelectedSeats((prevSelected) => {
+      if (isCurrentlySelected) {
+        return prevSelected.filter((s) => s.id !== seat.id);
+      } else {
+        return [...prevSelected, seat];
+      }
+    });
+  };
+
+  /**
+   * Calculate total price of selected seats
+   */
+  const getTotalPrice = () => {
+    return selectedSeats.reduce((total, seat) => total + seat.price, 0);
+  };
+
+  /**
+   * Handle booking completion
+   */
+  const handleBooking = () => {
+    if (selectedSeats.length === 0) {
+      alert('Please select at least one seat to book.');
+      return;
+    }
+
+    // Update seats state - mark selected seats as booked
+    setSeats((prevSeats) => {
+      return prevSeats.map((row) => {
+        return row.map((seat) => {
+          const isSelected = selectedSeats.some((s) => s.id === seat.id);
+          if (isSelected) {
+            return {
+              ...seat,
+              status: 'booked',
+              selected: false
+            };
+          }
+          return seat;
+        });
+      });
+    });
+
+    // Create booking data
+    const bookingData = {
+      seats: selectedSeats.map((seat) => ({
+        id: seat.id,
+        type: seat.type,
+        price: seat.price
+      })),
+      totalPrice: getTotalPrice(),
+      seatIds: selectedSeats.map((s) => s.id),
+      timestamp: new Date().toISOString()
+    };
+
+    onBookingComplete(bookingData);
+
+    const seatCount = selectedSeats.length;
+    const total = getTotalPrice();
+    alert(`Successfully booked ${seatCount} seat(s) for ${currency}${total}!`);
+
+    setSelectedSeats([]);
+  };
 
   /**
    * Get appropriate className for seat based on its state
-   * @param {Object} seat - Seat object with type, status, selected properties
-   * @returns {string} - Complete className string for the seat
    */
   const getSeatClassName = (seat) => {
-    // Base classes for all seats
     const baseClasses = 'w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 m-0.5 rounded-t-lg border-2 cursor-pointer transition-all duration-200 flex items-center justify-center text-xs sm:text-sm font-bold';
 
-    // If seat is booked
     if (seat.status === 'booked') {
       return `${baseClasses} bg-gray-300 border-gray-400 text-gray-600 cursor-not-allowed`;
     }
 
-    // If seat is selected
     if (seat.selected) {
       return `${baseClasses} bg-green-500 border-green-600 text-white transform scale-110`;
     }
 
-    // Available seat - use seat type color with hover effect
     const colorClasses = getColorClass(seat.color);
     return `${baseClasses} ${colorClasses.bg} ${colorClasses.border} ${colorClasses.text} hover:scale-105`;
   };
 
   /**
    * Render a section of seats in a row
-   * @param {Array} seatRow - Array of seat objects for the row
-   * @param {number} startIndex - Start index of the section
-   * @param {number} endIndex - End index of the section
-   * @param {number} rowIndex - Row index for key generation
-   * @returns {JSX.Element[]} - Array of seat elements
    */
   const renderSeatSection = (seatRow, startIndex, endIndex, rowIndex) => {
     return seatRow.slice(startIndex, endIndex).map((seat, index) => {
       const seatNumber = startIndex + index + 1;
+      const seatIndex = startIndex + index;
       const seatInfo = `Seat ${seat.id} - ${seat.type} - ${currency}${seat.price}`;
       const statusText = seat.status === 'booked' ? 'Booked' : seat.selected ? 'Selected' : 'Available';
       const ariaLabel = `${seatInfo} - ${statusText}`;
+      const className = getSeatClassName(seat);
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleSeatClick(rowIndex, seatIndex);
+        }
+      };
 
       return (
         <div
           key={seat.id}
-          className={getSeatClassName(seat)}
+          className={className}
           title={seatInfo}
           aria-label={ariaLabel}
           role="button"
           tabIndex={seat.status === 'booked' ? -1 : 0}
+          onClick={() => handleSeatClick(rowIndex, seatIndex)}
+          onKeyDown={handleKeyDown}
         >
           {seatNumber}
         </div>
@@ -218,24 +285,9 @@ function CinemaSeatBooking({
     });
   };
 
-  // Log props for testing
-  useEffect(() => {
-    console.log('=== CinemaSeatBooking Props ===');
-    console.log('Layout:', layout);
-    console.log('Seat Types:', seatTypes);
-    console.log('Booked Seats:', bookedSeats);
-    console.log('Currency:', currency);
-    console.log('Title:', title);
-    console.log('Subtitle:', subtitle);
-    console.log('OnBookingComplete:', typeof onBookingComplete);
-    console.log('===============================');
-  }, [layout, seatTypes, bookedSeats, currency, title, subtitle, onBookingComplete]);
-
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
-      {/* Main Container - Centered with max width */}
       <div className="max-w-6xl mx-auto">
-
         {/* Title Section */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-3">
@@ -248,7 +300,6 @@ function CinemaSeatBooking({
 
         {/* Cinema Screen */}
         <div className="flex flex-col items-center mb-16">
-          {/* Screen visual - curved gradient */}
           <div className="w-full max-w-4xl mb-4">
             <div className="h-2 bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 rounded-t-full shadow-lg transform perspective-1000"
                  style={{
@@ -257,8 +308,6 @@ function CinemaSeatBooking({
                  }}>
             </div>
           </div>
-
-          {/* Screen Label */}
           <div className="text-sm font-medium text-gray-500 tracking-widest">
             SCREEN
           </div>
@@ -275,33 +324,26 @@ function CinemaSeatBooking({
 
                 return (
                   <div key={rowLetter} className="flex items-center gap-2">
-                    {/* Row Letter */}
                     <div className="w-8 text-center font-bold text-gray-600 text-sm">
                       {rowLetter}
                     </div>
 
-                    {/* First Section - Before first aisle */}
                     <div className="flex gap-1">
                       {renderSeatSection(seatRow, 0, firstAisle, rowIndex)}
                     </div>
 
-                    {/* First Aisle */}
                     <div className="w-6 md:w-8"></div>
 
-                    {/* Second Section - Between aisles */}
                     <div className="flex gap-1">
                       {renderSeatSection(seatRow, firstAisle, secondAisle, rowIndex)}
                     </div>
 
-                    {/* Second Aisle */}
                     <div className="w-6 md:w-8"></div>
 
-                    {/* Third Section - After second aisle */}
                     <div className="flex gap-1">
                       {renderSeatSection(seatRow, secondAisle, layout.seatsPerRow, rowIndex)}
                     </div>
 
-                    {/* Row Letter (right side) */}
                     <div className="w-8 text-center font-bold text-gray-600 text-sm">
                       {rowLetter}
                     </div>
@@ -312,12 +354,96 @@ function CinemaSeatBooking({
           </div>
         </div>
 
+        {/* Seat Legend */}
+        <div className="flex justify-center mt-8 mb-6">
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              {Object.entries(seatTypes).map(([type, config], index) => {
+                const color = COLORS[index % COLORS.length];
+                const colorClasses = getColorClass(color);
+
+                return (
+                  <div key={type} className="flex items-center">
+                    <div
+                      className={`w-8 h-8 border-2 rounded-t-lg mr-2 ${colorClasses.bg} ${colorClasses.border}`}
+                    ></div>
+                    <span className="text-sm font-medium text-gray-700">
+                      {type.charAt(0).toUpperCase() + type.slice(1)} ({currency}{config.price})
+                    </span>
+                  </div>
+                );
+              })}
+
+              <div className="flex items-center">
+                <div className="w-8 h-8 border-2 rounded-t-lg mr-2 bg-green-500 border-green-600"></div>
+                <span className="text-sm font-medium text-gray-700">Selected</span>
+              </div>
+
+              <div className="flex items-center">
+                <div className="w-8 h-8 border-2 rounded-t-lg mr-2 bg-gray-300 border-gray-400"></div>
+                <span className="text-sm font-medium text-gray-700">Booked</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Booking Summary */}
+        <div className="flex justify-center mb-6">
+          <div className="w-full max-w-md bg-gray-50 rounded-lg p-6 border border-gray-200">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Booking Summary</h3>
+
+            {selectedSeats.length === 0 ? (
+              <p className="text-sm text-gray-500">No seats selected</p>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Selected Seats: </span>
+                  <span className="text-sm text-gray-900">
+                    {selectedSeats.map((s) => s.id).join(', ')}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Number of Seats: </span>
+                  <span className="text-sm text-gray-900">{selectedSeats.length}</span>
+                </div>
+
+                <div className="pt-2 border-t border-gray-300">
+                  <span className="text-base font-bold text-gray-700">Total: </span>
+                  <span className="text-2xl font-bold text-green-600">
+                    {currency}{getTotalPrice().toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Book Now Button */}
+        <div className="flex justify-center mt-8">
+          <button
+            onClick={handleBooking}
+            disabled={selectedSeats.length === 0}
+            className={`
+              w-full max-w-md px-8 py-4 rounded-lg font-bold text-lg
+              transition-all duration-200 transform
+              ${selectedSeats.length === 0
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-green-500 text-white hover:bg-green-600 hover:scale-105 active:scale-95'
+              }
+            `}
+          >
+            {selectedSeats.length === 0
+              ? 'Select Seats to Book'
+              : `Book ${selectedSeats.length} Seat(s) - ${currency}${getTotalPrice()}`
+            }
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// PropTypes for type checking
 CinemaSeatBooking.propTypes = {
   layout: PropTypes.shape({
     rows: PropTypes.number.isRequired,
