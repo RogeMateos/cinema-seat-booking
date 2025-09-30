@@ -421,6 +421,77 @@ function CinemaSeatBooking({
           </div>
         </div>
 
+        {/* Seat Legend */}
+        <div className="flex justify-center mt-8 mb-6">
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              {/* Seat Type Indicators */}
+              {Object.entries(seatTypes).map(([type, config], index) => {
+                const color = COLORS[index % COLORS.length];
+                const colorClasses = getColorClass(color);
+
+                return (
+                  <div key={type} className="flex items-center">
+                    <div
+                      className={`w-8 h-8 border-2 rounded-t-lg mr-2 ${colorClasses.bg} ${colorClasses.border}`}
+                    ></div>
+                    <span className="text-sm font-medium text-gray-700">
+                      {type.charAt(0).toUpperCase() + type.slice(1)} ({currency}{config.price})
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* Selected Indicator */}
+              <div className="flex items-center">
+                <div className="w-8 h-8 border-2 rounded-t-lg mr-2 bg-green-500 border-green-600"></div>
+                <span className="text-sm font-medium text-gray-700">Selected</span>
+              </div>
+
+              {/* Booked Indicator */}
+              <div className="flex items-center">
+                <div className="w-8 h-8 border-2 rounded-t-lg mr-2 bg-gray-300 border-gray-400"></div>
+                <span className="text-sm font-medium text-gray-700">Booked</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Booking Summary */}
+        <div className="flex justify-center mb-6">
+          <div className="w-full max-w-md bg-gray-50 rounded-lg p-6 border border-gray-200">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Booking Summary</h3>
+
+            {selectedSeats.length === 0 ? (
+              <p className="text-sm text-gray-500">No seats selected</p>
+            ) : (
+              <div className="space-y-3">
+                {/* Selected Seats */}
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Selected Seats: </span>
+                  <span className="text-sm text-gray-900">
+                    {selectedSeats.map((s) => s.id).join(', ')}
+                  </span>
+                </div>
+
+                {/* Number of Seats */}
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Number of Seats: </span>
+                  <span className="text-sm text-gray-900">{selectedSeats.length}</span>
+                </div>
+
+                {/* Total */}
+                <div className="pt-2 border-t border-gray-300">
+                  <span className="text-base font-bold text-gray-700">Total: </span>
+                  <span className="text-2xl font-bold text-green-600">
+                    {currency}{getTotalPrice().toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Book Now Button */}
         <div className="flex justify-center mt-8">
           <button
