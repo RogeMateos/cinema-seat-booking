@@ -235,7 +235,7 @@ function CinemaSeatBooking({
    * Get appropriate className for seat based on its state
    */
   const getSeatClassName = (seat) => {
-    const baseClasses = 'w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 m-0.5 rounded-t-lg border-2 cursor-pointer transition-all duration-200 flex items-center justify-center text-xs sm:text-sm font-bold';
+    const baseClasses = 'w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 m-px sm:m-0.5 rounded-t-lg border-2 cursor-pointer transition-all duration-200 flex items-center justify-center text-[10px] sm:text-xs md:text-sm font-bold';
 
     if (seat.status === 'booked') {
       return `${baseClasses} bg-gray-300 border-gray-400 text-gray-600 cursor-not-allowed`;
@@ -286,20 +286,20 @@ function CinemaSeatBooking({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-8 px-2 sm:px-4">
       <div className="max-w-6xl mx-auto">
         {/* Title Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-3">
+        <div className="text-center mb-6 sm:mb-12">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-2 sm:mb-3">
             {title}
           </h1>
-          <p className="text-lg md:text-xl text-gray-600">
+          <p className="text-sm sm:text-lg md:text-xl text-gray-600">
             {subtitle}
           </p>
         </div>
 
         {/* Cinema Screen */}
-        <div className="flex flex-col items-center mb-16">
+        <div className="flex flex-col items-center mb-6 sm:mb-12">
           <div className="w-full max-w-4xl mb-4">
             <div className="h-2 bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 rounded-t-full shadow-lg transform perspective-1000"
                  style={{
@@ -314,37 +314,37 @@ function CinemaSeatBooking({
         </div>
 
         {/* Seat Map */}
-        <div className="flex justify-center overflow-x-auto pb-8">
-          <div className="inline-block">
-            <div className="flex flex-col gap-2">
+        <div className="flex justify-center overflow-x-auto pb-8 px-2 sm:px-0 -mx-4 sm:mx-0">
+          <div className="inline-block min-w-fit px-2 sm:px-0">
+            <div className="flex flex-col gap-1 sm:gap-2">
               {seats.map((seatRow, rowIndex) => {
                 const rowLetter = String.fromCharCode(65 + rowIndex);
                 const firstAisle = layout.aislePositions[0];
                 const secondAisle = layout.aislePositions[1];
 
                 return (
-                  <div key={rowLetter} className="flex items-center gap-2">
-                    <div className="w-8 text-center font-bold text-gray-600 text-sm">
+                  <div key={rowLetter} className="flex items-center gap-1 sm:gap-2">
+                    <div className="w-5 sm:w-8 text-center font-bold text-gray-600 text-xs sm:text-sm flex-shrink-0">
                       {rowLetter}
                     </div>
 
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5 sm:gap-1">
                       {renderSeatSection(seatRow, 0, firstAisle, rowIndex)}
                     </div>
 
-                    <div className="w-6 md:w-8"></div>
+                    <div className="w-2 sm:w-4 md:w-6 flex-shrink-0"></div>
 
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5 sm:gap-1">
                       {renderSeatSection(seatRow, firstAisle, secondAisle, rowIndex)}
                     </div>
 
-                    <div className="w-6 md:w-8"></div>
+                    <div className="w-2 sm:w-4 md:w-6 flex-shrink-0"></div>
 
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5 sm:gap-1">
                       {renderSeatSection(seatRow, secondAisle, layout.seatsPerRow, rowIndex)}
                     </div>
 
-                    <div className="w-8 text-center font-bold text-gray-600 text-sm">
+                    <div className="hidden sm:block w-8 text-center font-bold text-gray-600 text-sm flex-shrink-0">
                       {rowLetter}
                     </div>
                   </div>
@@ -355,9 +355,9 @@ function CinemaSeatBooking({
         </div>
 
         {/* Seat Legend */}
-        <div className="flex justify-center mt-8 mb-6">
-          <div className="bg-white p-4 rounded-lg shadow-sm">
-            <div className="flex flex-wrap items-center justify-center gap-6">
+        <div className="flex justify-center mt-4 sm:mt-8 mb-4 sm:mb-6 px-2">
+          <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm w-full max-w-2xl">
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6">
               {Object.entries(seatTypes).map(([type, config], index) => {
                 const color = COLORS[index % COLORS.length];
                 const colorClasses = getColorClass(color);
@@ -365,9 +365,9 @@ function CinemaSeatBooking({
                 return (
                   <div key={type} className="flex items-center">
                     <div
-                      className={`w-8 h-8 border-2 rounded-t-lg mr-2 ${colorClasses.bg} ${colorClasses.border}`}
+                      className={`w-6 h-6 sm:w-8 sm:h-8 border-2 rounded-t-lg mr-1.5 sm:mr-2 flex-shrink-0 ${colorClasses.bg} ${colorClasses.border}`}
                     ></div>
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-xs sm:text-sm font-medium text-gray-700">
                       {type.charAt(0).toUpperCase() + type.slice(1)} ({currency}{config.price})
                     </span>
                   </div>
@@ -375,22 +375,22 @@ function CinemaSeatBooking({
               })}
 
               <div className="flex items-center">
-                <div className="w-8 h-8 border-2 rounded-t-lg mr-2 bg-green-500 border-green-600"></div>
-                <span className="text-sm font-medium text-gray-700">Selected</span>
+                <div className="w-6 h-6 sm:w-8 sm:h-8 border-2 rounded-t-lg mr-1.5 sm:mr-2 flex-shrink-0 bg-green-500 border-green-600"></div>
+                <span className="text-xs sm:text-sm font-medium text-gray-700">Selected</span>
               </div>
 
               <div className="flex items-center">
-                <div className="w-8 h-8 border-2 rounded-t-lg mr-2 bg-gray-300 border-gray-400"></div>
-                <span className="text-sm font-medium text-gray-700">Booked</span>
+                <div className="w-6 h-6 sm:w-8 sm:h-8 border-2 rounded-t-lg mr-1.5 sm:mr-2 flex-shrink-0 bg-gray-300 border-gray-400"></div>
+                <span className="text-xs sm:text-sm font-medium text-gray-700">Booked</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Booking Summary */}
-        <div className="flex justify-center mb-6">
-          <div className="w-full max-w-md bg-gray-50 rounded-lg p-6 border border-gray-200">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Booking Summary</h3>
+        <div className="flex justify-center mb-4 sm:mb-6 px-2">
+          <div className="w-full max-w-md bg-gray-50 rounded-lg p-4 sm:p-6 border border-gray-200">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">Booking Summary</h3>
 
             {selectedSeats.length === 0 ? (
               <p className="text-sm text-gray-500">No seats selected</p>
@@ -420,12 +420,12 @@ function CinemaSeatBooking({
         </div>
 
         {/* Book Now Button */}
-        <div className="flex justify-center mt-8">
+        <div className="flex justify-center mt-4 sm:mt-8 px-2">
           <button
             onClick={handleBooking}
             disabled={selectedSeats.length === 0}
             className={`
-              w-full max-w-md px-8 py-4 rounded-lg font-bold text-lg
+              w-full max-w-md px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg
               transition-all duration-200 transform
               ${selectedSeats.length === 0
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
