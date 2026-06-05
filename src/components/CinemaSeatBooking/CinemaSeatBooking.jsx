@@ -1,56 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 import SeatMap from '../SeatMap';
 import SeatLegend from '../SeatLegend';
 import BookingModal from '../BookingModal';
-
-const DEFAULT_LAYOUT = {
-  rows: 10,
-  seatsPerRow: 12,
-  aislePositions: [3, 9],
-};
-
-const DEFAULT_SEAT_TYPES = {
-  regular: { price: 9.99,  rows: [0, 1, 2, 3, 4] },
-  premium: { price: 12.99, rows: [5, 6, 7] },
-  vip:     { price: 16.99, rows: [8, 9] },
-};
-
-const COLORS = ['blue', 'purple', 'yellow', 'green'];
-
-function buildInitialSeats(layout, bookedSeats, seatTypes) {
-  return Array.from({ length: layout.rows }, (_, row) => {
-    const rowLetter = String.fromCharCode(65 + row);
-    let colorIndex = 0;
-    let type = 'regular';
-    let color = COLORS[0];
-    let price = seatTypes.regular?.price || 0;
-
-    for (const [t, config] of Object.entries(seatTypes)) {
-      if (config.rows.includes(row)) {
-        type = t;
-        color = COLORS[colorIndex % COLORS.length];
-        price = config.price;
-        break;
-      }
-      colorIndex++;
-    }
-
-    return Array.from({ length: layout.seatsPerRow }, (_, i) => {
-      const id = `${rowLetter}${i + 1}`;
-      return {
-        id,
-        row: rowLetter,
-        seat: i + 1,
-        type,
-        price,
-        color,
-        status: bookedSeats.includes(id) ? 'booked' : 'available',
-        selected: false,
-      };
-    });
-  });
-}
+import { useSeatSelection } from '../../hooks/useSeatSelection';
+import { DEFAULT_LAYOUT, DEFAULT_SEAT_TYPES } from './constants';
 
 function CinemaSeatBooking({
   layout = DEFAULT_LAYOUT,
@@ -61,50 +15,16 @@ function CinemaSeatBooking({
   title = 'Cinema Hall Booking',
   subtitle = 'Select your seats',
 }) {
-  const [seats, setSeats] = useState(() => buildInitialSeats(layout, bookedSeats, seatTypes));
+  const { seats, selectedSeats, hasBookedSeats, totalPrice, handleSeatClick, handleReset, confirmBooking } =
+    useSeatSelection({ layout, seatTypes, bookedSeats });
+
   const [modal, setModal] = useState({ isOpen: false, bookingData: null });
-
-  const selectedSeats = useMemo(() => seats.flat().filter((s) => s.selected), [seats]);
-  const hasBookedSeats = useMemo(() => seats.flat().some((s) => s.status === 'booked'), [seats]);
-  const totalPrice = useMemo(
-    () => selectedSeats.reduce((sum, s) => sum + s.price, 0),
-    [selectedSeats]
-  );
-
-  const handleSeatClick = (rowIndex, seatIndex) => {
-    setSeats((prev) =>
-      prev.map((row, rIdx) =>
-        rIdx === rowIndex
-          ? row.map((s, sIdx) => (sIdx === seatIndex ? { ...s, selected: !s.selected } : s))
-          : row
-      )
-    );
-  };
-
-  const handleReset = () => setSeats(buildInitialSeats(layout, [], seatTypes));
 
   const handleCloseModal = () => setModal({ isOpen: false, bookingData: null });
 
   const handleBooking = () => {
-    if (selectedSeats.length === 0) return;
-
-    const bookingData = {
-      seats: selectedSeats.map(({ id, type, price }) => ({ id, type, price })),
-      totalPrice,
-      seatIds: selectedSeats.map((s) => s.id),
-      timestamp: new Date().toISOString(),
-    };
-
-    setSeats((prev) =>
-      prev.map((row) =>
-        row.map((seat) =>
-          selectedSeats.some((s) => s.id === seat.id)
-            ? { ...seat, status: 'booked', selected: false }
-            : seat
-        )
-      )
-    );
-
+    const bookingData = confirmBooking();
+    if (!bookingData) return;
     onBookingComplete(bookingData);
     setModal({ isOpen: true, bookingData });
   };
